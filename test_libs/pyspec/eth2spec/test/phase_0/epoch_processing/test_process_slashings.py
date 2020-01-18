@@ -2,6 +2,7 @@ from eth2spec.test.context import spec_state_test, with_all_phases
 from eth2spec.test.phase_0.epoch_processing.run_epoch_process_base import (
     run_epoch_processing_with, run_epoch_processing_to
 )
+import pytest
 
 
 def run_process_slashings(spec, state):
@@ -20,6 +21,33 @@ def slash_validators(spec, state, indices, out_epochs):
     state.slashings[
         spec.get_current_epoch(state) % spec.EPOCHS_PER_SLASHINGS_VECTOR
     ] = total_slashed_balance
+
+
+#@with_all_phases
+#@spec_state_test
+@pytest.mark.parametrize(
+    "slashable,s0,t0,s1,t1",
+    [
+        (False, 0, 5, 1, 6),  # 0->5 distinct from 1->6
+        (False, 1, 6, 0, 5),  # 0->5 distinct from 1->6
+        (True, 0, 5, 1, 4),   # 1->4 inside 0->5
+        (True, 1, 4, 0, 5),   # 1->4 inside 0->5
+    ]
+)
+def test_slashings(slashable, s0, t0, s1, t1):
+    # what should the epoch for each be?
+    from eth2spec.phase0.spec import AttestationData, Checkpoint
+    from eth2spec.phase0.spec import is_slashable_attestation_data
+    data0 = AttestationData(
+        source=Checkpoint(epoch=s0),
+        target=Checkpoint(epoch=t0),
+    )
+    data1 = AttestationData(
+        source=Checkpoint(epoch=s1),
+        target=Checkpoint(epoch=t1),
+    )
+    result = is_slashable_attestation_data(data0, data1)
+    assert slashable == result, "Expected {}, got {} for: {}->{} {}->{}".format(slashable, result, s0, t0, s1, t1)
 
 
 @with_all_phases
